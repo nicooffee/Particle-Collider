@@ -1,0 +1,1 @@
+gcc main.c -lncurses && ./a.out 10 4 1000 1000;
