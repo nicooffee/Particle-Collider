@@ -1,0 +1,1 @@
+gcc participant_test.c participant.c && ./a.out
