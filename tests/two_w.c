@@ -22,7 +22,7 @@ int main(){
     struct Message_w *wm1,*wm2;
     int maxX, maxY;
     pthread_t thread_w1,thread_w2;
-    initscr();
+    init_setup();
     getmaxyx(stdscr,maxY,maxX);
     w1 = newwin(maxY,maxX/2,0,0);
     w2 = newwin(maxY,maxX/2,0,maxX/2+1);
@@ -30,7 +30,6 @@ int main(){
     wm2 = (struct Message_w*) calloc(1,sizeof(struct Message_w));
     wm1->w = w1;
     wm2->w = w2;
-    init_setup();
     pthread_create(&thread_w1,NULL,&foo,(void *) wm1);
     pthread_create(&thread_w2,NULL,&foo,(void *) wm2);
     pthread_join(thread_w1, NULL);
@@ -77,7 +76,7 @@ void *foo(void *m){
 }
 
 void init_setup(){
-        
+    initscr();
     srand((unsigned) time(NULL));   
     noecho();
     start_color();

@@ -1,0 +1,1 @@
+gcc participant_list_test.c participant_list.c participant.c && ./a.out
