@@ -128,10 +128,10 @@ void participant_reset_position(Participant p){
  * 
  * In:  p: Participante a mover.
  */
-void participant_move(Participant p){
+int participant_move(Participant p){
     int r,posx,posy,maxx,maxy,minx,miny;
-    if(p == NULL)
-        return;
+    if(p == NULL || p->particleNum==0)
+        return 0;
     posx = p->posX;
     posy = p->posY;
     maxx = p->maxX;
@@ -155,7 +155,7 @@ void participant_move(Participant p){
     }
     p->posX = p->posX + p->dirX;
     p->posY = p->posY + p->dirY;
-    return;
+    return 1;
 }
 
 

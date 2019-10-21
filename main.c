@@ -16,6 +16,21 @@
 #include "libraries/participant_list.h"
 #include "libraries/participant.h"
 
+#define ROJO        1
+#define VERDE       2
+#define AMARILLO    3
+#define CYAN        4
+#define MAGENTA     5
+#define BLANCO      6
+#define AZUL        7
+#define BLANCO_ROJO     8
+#define BLANCO_VERDE    9
+#define BLANCO_AMARILLO 10
+#define BLANCO_CYAN     11
+#define BLANCO_MAGENTA  12
+#define BLANCO_NEGRO    13
+#define BLANCO_AZUL     14
+
 /**-------------------------------------------ESTRUCTURAS------------------------------------------------------------**/
 /**
  * struct Message_w
@@ -72,12 +87,12 @@ struct Colision{
 void init_setup();
 void print_participant(Participant p, WINDOW *w);
 void *print_participant_list(void *message);
-void print_info(WINDOW *w,struct Colision **colisiones);
+void print_info(WINDOW *w,struct Colision **colisiones,int restantes);
 void *move_participant_list(void * message);
 struct Message_p *create_message_p(Participant_list listp,Participant p,int delay,int maxInstantm,struct Colision **colisiones);
 struct Message_w *create_message_w(Participant_list listp, WINDOW *w1,WINDOW *w2,int d,int i,struct Colision **colisiones);
 struct Colision *create_colision(int inst,int posx,int posy,int id1,int id2);
-
+void *stop_ejec(void *message);
 
 /**-------------------------------------------VARIABLES GLOBALES-----------------------------------------------------**/
 int INSTANT = 0;                                                //Instante de la simulación.
@@ -86,6 +101,7 @@ int first_coll;                                                 //Posición de l
 int length_coll;                                                //Cantidad de colisiones a guardar (las n ultimas).
 pthread_mutex_t mutex_screen=PTHREAD_MUTEX_INITIALIZER;         //Mutex para sincronizar las ventanas.
 pthread_mutex_t mutex_participant=PTHREAD_MUTEX_INITIALIZER;    //Mutex para sincronizar el uso de lista de participantes.
+int ejec_flag = 1;
 /**
  * Parametros de inicio:
  *  - n:    Cantidad de particulas de cada participante.
@@ -94,7 +110,7 @@ pthread_mutex_t mutex_participant=PTHREAD_MUTEX_INITIALIZER;    //Mutex para sin
  *  - d:    Delay de refresco de ventana.
  */
 int main(int args, char **argv){
-    pthread_t thread_screen1,*thread_participant;
+    pthread_t thread_screen1,*thread_participant,thread_ejec;
     struct Message_w *screen_message;
     struct Message_p **participant_message;
     struct Colision **colisiones=NULL;
@@ -119,18 +135,20 @@ int main(int args, char **argv){
     i = atoi(argv[3]);
     d = atoi(argv[4]);
     first_coll = 0;
-    length_coll = maxy/2-4;
+    length_coll = maxy/2-5;
     colisiones = (struct Colision**) calloc(length_coll,sizeof(struct Colision*));
     list = participant_list_create(k,n,maxx_p-1,maxy_p-1,1,1);
     screen_message =        create_message_w(list,w_particle,w_data,d,i,colisiones);
     thread_participant =    (pthread_t*) calloc(k,sizeof(pthread_t));
     participant_message =   (struct Message_p**) calloc(k,sizeof(struct Message_p*));
     pthread_create(&thread_screen1,NULL,&print_participant_list,(void *) screen_message);
+    pthread_create(&thread_ejec,NULL,&stop_ejec,(void *) screen_message);
     for(j=0;j<k;j++){
         participant_message[j] = create_message_p(list,participant_list_get(list,j),d,i,colisiones);
         pthread_create(&thread_participant[j],NULL,&move_participant_list,(void *)participant_message[j]);
     }
     pthread_join(thread_screen1, NULL);
+    pthread_join(thread_ejec,NULL);;
     for(j=0;j<k;j++)
         pthread_join(thread_participant[j],NULL);
     participant_list_free(list);
@@ -170,24 +188,21 @@ void *move_participant_list(void * message){
     int delay;
     int maxInstant;
     int flag=1;
-    int inst;
     struct Colision **colisiones=NULL;
     if(message==NULL) return NULL;
-    listp = ((struct Message_p*) message)->listp;
-    delay = ((struct Message_p*) message)->delay;
-    maxInstant = ((struct Message_p*) message)->maxInstant;
-    colisiones = ((struct Message_p*) message)->colisiones;
-    p = ((struct Message_p*) message)->p;
-    while(flag!=0 && (maxInstant==-1 || INSTANT<=maxInstant)){
+    listp           = ((struct Message_p*) message)->listp;
+    delay           = ((struct Message_p*) message)->delay;
+    maxInstant      = ((struct Message_p*) message)->maxInstant;
+    colisiones      = ((struct Message_p*) message)->colisiones;
+    p               = ((struct Message_p*) message)->p;
+    while(flag!=0 && (maxInstant==-1 || INSTANT<=maxInstant) && ejec_flag){
         pthread_mutex_lock(&mutex_participant);
         flag=participant_list_move(listp,p,&aux);
-        inst = INSTANT;
-        INSTANT = INSTANT + 1;
         if(aux != NULL){
             first_coll = ((first_coll - 1)<0?length_coll+(first_coll - 1):first_coll - 1)% length_coll;
             if(colisiones[first_coll]!=NULL) free(colisiones[first_coll]);
             colisiones[first_coll] = \
-                create_colision(inst,\
+                create_colision(INSTANT,\
                                 participant_get_x(p),\
                                 participant_get_y(p),\
                                 participant_get_id(p),\
@@ -195,6 +210,7 @@ void *move_participant_list(void * message){
             COLISIONES = COLISIONES + 1;
             aux=NULL;
         }
+        INSTANT = INSTANT + 1;
         pthread_mutex_unlock(&mutex_participant);
         usleep(delay);
     }
@@ -214,16 +230,21 @@ void *move_participant_list(void * message){
  * asegurar el uso único de la lista de participantes. 
  */
 void *print_participant_list(void *message){
-    int j,flg,delay,maxInstant;
-    Participant_list listp=((struct Message_w*) message)->listp;
+    int j,delay,maxInstant,w2_mx,w2_my;
+    Participant_list listp;
     Participant aux;
-    WINDOW *w1=((struct Message_w*) message)->w1;
-    WINDOW *w2=((struct Message_w*) message)->w2;
-    delay=((struct Message_w*) message)->delay;
-    maxInstant = ((struct Message_w*) message)->maxInstant;
-    while((maxInstant==-1 || INSTANT<=maxInstant)){
+    listp       = ((struct Message_w*) message)->listp;
+    WINDOW *w1  = ((struct Message_w*) message)->w1;
+    WINDOW *w2  = ((struct Message_w*) message)->w2;
+    delay       = ((struct Message_w*) message)->delay;
+    maxInstant  = ((struct Message_w*) message)->maxInstant;
+    getmaxyx(w2,w2_my,w2_mx);
+    while(ejec_flag){
+        wclear(w1);
+        wclear(w2);
+        wattron(w1,COLOR_PAIR(BLANCO));
         box(w1,'*','*');
-        flg = first_coll;
+        wattroff(w1,COLOR_PAIR(BLANCO));
         pthread_mutex_lock(&mutex_screen);
         pthread_mutex_lock(&mutex_participant);
         for(j=0;j<participant_list_get_length(listp);j++){
@@ -233,16 +254,51 @@ void *print_participant_list(void *message){
                 wnoutrefresh(w1);
             }
         }
-        print_info(w2,((struct Message_w*) message)->colisiones);
+        print_info(w2,((struct Message_w*) message)->colisiones,participant_list_get_numActive(listp));
+        wattron(w2,COLOR_PAIR(BLANCO_VERDE));
+        mvwhline(w2,w2_my-7,1,'-',w2_mx-2);
+        wattroff(w2,COLOR_PAIR(BLANCO_VERDE));
+        mvwprintw(w2,w2_my-6,2," Ejecucion en modo: ");
+        if(maxInstant==-1){
+            wattron(w2,COLOR_PAIR(BLANCO_ROJO));
+            wprintw(w2,"indefinido.");
+            wattroff(w2,COLOR_PAIR(BLANCO_ROJO));
+        } 
+        else{
+            wattron(w2,COLOR_PAIR(BLANCO_VERDE));
+            wprintw(w2,"limitado");
+            wattroff(w2,COLOR_PAIR(BLANCO_VERDE));
+            wprintw(w2,", en %d iteraciones.",maxInstant);
+        } 
+        mvwprintw(w2,w2_my-5,2," Presione ESC para detener.");
+        wnoutrefresh(w2);
         pthread_mutex_unlock(&mutex_screen);
         pthread_mutex_unlock(&mutex_participant);
         doupdate();
         usleep(delay/2);
-        wclear(w1);
-        wclear(w2);
     }
+    mvwhline(w2,w2_my-6,2,' ',w2_mx-3);
+    mvwhline(w2,w2_my-5,2,' ',w2_mx-3);
+    mvwprintw(w2,w2_my-6,2," Simulacion ejecutada con exito.");
+    mvwprintw(w2,w2_my-5,2," Presione ESC para salir.");
+    wrefresh(w2);
+    while(wgetch(w2)!=27);
 }
 
+
+
+
+
+/**
+ * stop_ejec:
+ * 
+ * Funcion para finalizar la ejecución general de las demás hebras.
+ */
+void *stop_ejec(void *message){
+    WINDOW *w2  = ((struct Message_w*) message)->w2;
+    while(wgetch(w2)!=27);
+    ejec_flag = 0;
+}
 
 
 
@@ -254,36 +310,33 @@ void *print_participant_list(void *message){
  * dentro de la simulación en la pantalla w. Además muestra datos globales
  * relacionados con la simulación.
  */
-void print_info(WINDOW *w,struct Colision **colisiones){
+void print_info(WINDOW *w,struct Colision **colisiones,int restantes){
     int line;
     int j;
     int maxx,maxy;
-    char *buffer=(char*) calloc(100,sizeof(char));
     struct Colision *aux_col;
-    box(w,'*','*');
-    wnoutrefresh(w);
-    line = 3;
     getmaxyx(w,maxy,maxx);
-    sprintf(buffer,"| Instante: %10d| C. Colisiones: %10d",INSTANT,COLISIONES);
-    mvwhline(w,line,1,' ',maxx-2);
-    mvwprintw(w,1,1,buffer);
-    wnoutrefresh(w);
+    mvwvline(w,1,1,'|',maxy-2);
+    wattron(w,COLOR_PAIR(BLANCO_CYAN));
+    box(w,'*','*');
+    wattroff(w,COLOR_PAIR(BLANCO_CYAN));
+    line = 4;
+    mvwhline(w,1,2,' ',maxx-3);
+    mvwprintw(w,1,2," Instante actual: %10d",INSTANT);
+    mvwhline(w,2,2,' ',maxx-3);
+    mvwprintw(w,2,2," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,restantes);
+    mvwhline(w,3,2,'-',maxx-3);
     j = first_coll;
     do{
         if(colisiones[j]!=NULL){
             aux_col = colisiones[j];
-            sprintf(buffer,"| Colision-> I: %10d|(x,y): (%4d,%4d)| %2d -><- %2d",aux_col->instante,aux_col->posX,aux_col->posY,aux_col->id1,aux_col->id2);
-            mvwhline(w,line,1,' ',maxx-2);
-            mvwprintw(w,line,1,buffer);
-            strcpy(buffer,"\0");
-            wnoutrefresh(w);
+            mvwhline(w,line,2,' ',maxx-3);
+            mvwprintw(w,line,2," Colision -> I: %8d|(x,y): (%3d,%3d)| %2d -><- %2d",aux_col->instante,aux_col->posX,aux_col->posY,aux_col->id1,aux_col->id2);
             line+=2;
         }
         j=(j+1)%length_coll; 
     }while(j!=first_coll && colisiones[j]!=NULL);
-    free(buffer);
 }
-
 
 
 
@@ -294,11 +347,10 @@ void print_info(WINDOW *w,struct Colision **colisiones){
  * de un participante en la ventana w.
  */
 void print_participant(Participant p, WINDOW *w){
-    wattron(w,COLOR_PAIR(participant_get_id(p)%14+1));
+    wattron(w,COLOR_PAIR(participant_get_id(p)%13+1));
     mvwprintw(w,participant_get_y(p),participant_get_x(p),"*");
     wattroff(w,COLOR_PAIR(participant_get_id(p)%13+1));
 }
-
 
 
 
@@ -313,21 +365,20 @@ void init_setup(){
     srand((unsigned) time(NULL));   
     noecho();
     start_color();
-    init_pair(1,COLOR_RED,COLOR_RED);
-    init_pair(2,COLOR_GREEN,COLOR_GREEN);
-    init_pair(3,COLOR_YELLOW,COLOR_YELLOW);
-    init_pair(4,COLOR_CYAN,COLOR_CYAN);
-    init_pair(5,COLOR_MAGENTA,COLOR_MAGENTA);
-    init_pair(6,COLOR_WHITE,COLOR_WHITE);
-    init_pair(7,COLOR_BLUE,COLOR_BLUE);
-
-    init_pair(8,COLOR_WHITE,COLOR_RED);
-    init_pair(9,COLOR_WHITE,COLOR_GREEN);
-    init_pair(10,COLOR_WHITE,COLOR_YELLOW);
-    init_pair(11,COLOR_WHITE,COLOR_CYAN);
-    init_pair(12,COLOR_WHITE,COLOR_MAGENTA);
-    init_pair(13,COLOR_WHITE,COLOR_WHITE);
-    init_pair(14,COLOR_WHITE,COLOR_BLUE);
+    init_pair(ROJO,COLOR_RED,COLOR_RED);
+    init_pair(VERDE,COLOR_GREEN,COLOR_GREEN);
+    init_pair(AMARILLO,COLOR_YELLOW,COLOR_YELLOW);
+    init_pair(CYAN,COLOR_CYAN,COLOR_CYAN);
+    init_pair(MAGENTA,COLOR_MAGENTA,COLOR_MAGENTA);
+    init_pair(BLANCO,COLOR_WHITE,COLOR_WHITE);
+    init_pair(AZUL,COLOR_BLUE,COLOR_BLUE);
+    init_pair(BLANCO_ROJO,COLOR_WHITE,COLOR_RED);
+    init_pair(BLANCO_VERDE,COLOR_WHITE,COLOR_GREEN);
+    init_pair(BLANCO_AMARILLO,COLOR_WHITE,COLOR_YELLOW);
+    init_pair(BLANCO_CYAN,COLOR_WHITE,COLOR_CYAN);
+    init_pair(BLANCO_MAGENTA,COLOR_WHITE,COLOR_MAGENTA);
+    init_pair(BLANCO_NEGRO,COLOR_WHITE,COLOR_BLACK);
+    init_pair(BLANCO_AZUL,COLOR_WHITE,COLOR_BLUE);
     curs_set(FALSE);
 }
 

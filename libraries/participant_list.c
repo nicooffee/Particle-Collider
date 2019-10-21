@@ -22,11 +22,13 @@
  * Dato para almacenar un listado de participantes y su cantidad.
  * 
  *  list            : Puntero a Participant. Se utiliza para generar un arreglo.
- *  numParticipant  : Cantidad de participantes del arreglo.   
+ *  numParticipant  : Cantidad de participantes del arreglo.
+ *  numActive       : Cantidad de participantes con al menos una partícula.
  */
 struct Participant_list{
     Participant *list;
     int numParticipant;
+    int numActive;
 };
 
 
@@ -52,6 +54,7 @@ Participant_list participant_list_create(int n,int numParticle, int maxx,int max
     new = (struct Participant_list *) calloc(1,sizeof(struct Participant_list));
     new->list = (Participant *) calloc(n,sizeof(Participant));
     new->numParticipant = n<2*((maxx-minx)+(maxy-miny))-4?n:2*((maxx-minx)+(maxy-miny))-4;
+    new->numActive = new->numParticipant;
     for(;i<n;i++){
         new->list[i] = participant_create(numParticle,i,maxx,maxy,minx,miny);
         while(participant_list_collision(new,new->list[i])!=NULL)
@@ -77,15 +80,20 @@ Participant_list participant_list_create(int n,int numParticle, int maxx,int max
  *                1 -> Se movió el participante y no hubo colisión.
  *                id -> Se movió el participante y si hubo colisión.
  */
-int participant_list_move(Participant_list listp,Participant p,Participant *coll){
+int participant_list_move(Participant_list listp,Participant p,Participant *coll){ 
+    int pp,pc;
     (*coll) = NULL;
-    if(participant_get_particleNum(p)==0) return 0;
-    participant_move(p);
-    (*coll) = participant_list_collision(listp,p);
-    if((*coll)==NULL) return 1;
-    participant_particle_collided(p);
-    participant_particle_collided((*coll));
-    return 1;
+    if(participant_move(p)){
+        (*coll) = participant_list_collision(listp,p);
+        if((*coll)==NULL) return 1;
+        participant_particle_collided(p);
+        participant_particle_collided((*coll));
+        pp = participant_get_particleNum(p);
+        pc = participant_get_particleNum((*coll));
+        listp->numActive -= ((pp<=0?1:0) + (pc<=0?1:0));
+        return 1;
+    }
+    return 0;
 }
 
 
@@ -152,6 +160,23 @@ int participant_list_get_length(Participant_list listp){
  */
 Participant participant_list_get(Participant_list listp,int id){
     return (id<0 || id>=listp->numParticipant)?NULL:listp->list[id];
+}
+
+
+
+
+
+/**
+ * participant_list_get_numActive:
+ * 
+ * Función que entrega la cantidad de participantes con partículas.
+ * 
+ * In:  listp   : Listado de participantes.
+ * 
+ * Out: Cantidad de participantes activos.
+ */
+int participant_list_get_numActive(Participant_list listp){
+    return listp==NULL?0:listp->numActive;
 }
 
 

@@ -7,4 +7,5 @@ extern int participant_list_move(Participant_list listp,Participant p,Participan
 extern Participant participant_list_collision(Participant_list listp,Participant p);
 extern int participant_list_get_length(Participant_list listp);
 extern Participant participant_list_get(Participant_list listp, int id);
+extern int participant_list_get_numActive(Participant_list listp);
 extern void participant_list_free(Participant_list listp);
