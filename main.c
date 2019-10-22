@@ -3,7 +3,7 @@
     Autores        : NICOLAS HONORATO DROGUETT, OSCAR FRITIS LOBOS.
 	Proposito      : Laboratorio 1 algoritmos distribuidos.
     Programa       : Movimiento de 4 particulas en forma concurrente.
-    Fecha          : Santiago de Chile, 24 de mayo de 2019
+    Fecha          : Santiago de Chile, 04 de noviembre de 2019
 	Compilador C   : gcc (Ubuntu 5.4.0-6ubuntu1~16.04.9) 5.4.0
 ************************************************************************************************************************/
 #include <stdio.h>
@@ -12,7 +12,6 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
-#include <string.h>
 #include "libraries/participant_list.h"
 #include "libraries/participant.h"
 
@@ -28,8 +27,9 @@
 #define BLANCO_AMARILLO 10
 #define BLANCO_CYAN     11
 #define BLANCO_MAGENTA  12
-#define BLANCO_NEGRO    13
+#define NEGRO_BLANCO    13
 #define BLANCO_AZUL     14
+#define BLANCO_NEGRO    15
 
 /**-------------------------------------------ESTRUCTURAS------------------------------------------------------------**/
 /**
@@ -85,18 +85,17 @@ struct Colision{
 };
 /**-----------------------------------------------PROTOTIPOS---------------------------------------------------------**/
 void init_setup();
-void print_participant(Participant p, WINDOW *w);
-void *print_window(void *message);
 void *move_participant_list(void * message);
 struct Message_p *create_message_p(Participant_list listp,Participant p,int delay,int maxInstantm,struct Colision **colisiones);
 struct Message_w *create_message_w(Participant_list listp, WINDOW *w1,WINDOW *w2,int d,int i,struct Colision **colisiones);
 struct Colision *create_colision(int inst,int posx,int posy,int id1,int id2);
 void *stop_ejec(void *message);
 
-
+void *print_window(void *message);
 void *print_info(void *message);
 void *print_colisiones(void *message);
 void *print_participant_list(void *message);
+void print_participant(Participant p, WINDOW *w);
 void set_frame_w1(WINDOW *w);
 void set_frame_w2(WINDOW *w);
 void set_msg_w2(WINDOW *w,int maxInstant);
@@ -108,10 +107,18 @@ int first_coll;                                                 //Posición de l
 int length_coll;                                                //Cantidad de colisiones a guardar (las n ultimas).
 pthread_mutex_t mutex_screen=PTHREAD_MUTEX_INITIALIZER;         //Mutex para sincronizar las ventanas.
 pthread_mutex_t mutex_participant=PTHREAD_MUTEX_INITIALIZER;    //Mutex para sincronizar el uso de lista de participantes.
-pthread_mutex_t mutex_screen_2=PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  cond_colision=PTHREAD_COND_INITIALIZER;
-int ejec_flag = 1;
+pthread_cond_t  cond_colision=PTHREAD_COND_INITIALIZER;         //Condición para thread que muestra el listado de colisiones.
+int ejec_flag = 1;                                              //Flag general de ejecución.
+
+
+
 /**
+ * main:
+ * 
+ * Se genera la lista de participantes, se crean los threads respectivos
+ * para que la simulación se ejecute. Luego de ejecutar la simulación, se
+ * libera la memoria utilizada por las varibles respectivas.
+ * 
  * Parametros de inicio:
  *  - n:    Cantidad de particulas de cada participante.
  *  - k:    Cantidad de participantes.
@@ -128,7 +135,7 @@ int main(int args, char **argv){
     int n,k,i,d;
     int j;
     int maxx,maxy;
-    int maxx_p,maxy_p,maxx_d,maxy_d;
+    int maxx_p,maxy_p;
     if(args < 5){
         printf("Parametros de ejecucion incorrectos.");
         exit(0);
@@ -138,7 +145,6 @@ int main(int args, char **argv){
     w_particle = newwin(maxy,maxx*5/10,0,0);
     w_data = newwin(maxy,maxx*5/10,0,maxx*5/10);
     getmaxyx(w_particle,maxy_p,maxx_p);
-    getmaxyx(w_particle,maxy_d,maxx_d);
     n = atoi(argv[1]);
     k = atoi(argv[2]);
     i = atoi(argv[3]);
@@ -146,7 +152,7 @@ int main(int args, char **argv){
     first_coll = 0;
     length_coll = maxy-13;
     colisiones = (struct Colision**) calloc(length_coll,sizeof(struct Colision*));
-    list = participant_list_create(k,n,maxx_p-1,maxy_p-1,1,1);
+    list = participant_list_create(k,n,maxx_p-2,maxy_p-2,0,0);
     screen_message =        create_message_w(list,w_particle,w_data,d,i,colisiones);
     thread_participant =    (pthread_t*) calloc(k,sizeof(pthread_t));
     participant_message =   (struct Message_p**) calloc(k,sizeof(struct Message_p*));
@@ -163,6 +169,7 @@ int main(int args, char **argv){
     participant_list_free(list);
     pthread_mutex_destroy(&mutex_screen);
     pthread_mutex_destroy(&mutex_participant);
+    pthread_cond_destroy(&cond_colision);
     free(thread_participant);
     free(screen_message);
     for(j=0;j<k;j++)
@@ -217,6 +224,8 @@ void *move_participant_list(void * message){
                                 participant_get_id(p),\
                                 participant_get_id(aux));
             COLISIONES = COLISIONES + 1;
+            participant_reset_position(p);
+            participant_reset_position(aux);
             pthread_cond_signal(&cond_colision);
             aux=NULL;
         }
@@ -234,15 +243,16 @@ void *move_participant_list(void * message){
 /**
  * print_window:
  * 
- * Función que imprime los datos de una lista de participantes dentro
- * de una ventana, según corresponda a los datos del mensaje. Se utilizan
- * dos mutex, uno para asegurar el uso único de la ventana y el otro para
- * asegurar el uso único de la lista de participantes. 
+ * Función que inicializa las subventanas de la simulación. Genera
+ * 3 thread que operan en las distintas subventanas, una para el tablero
+ * de particulas, una para mostrar los datos globales y otra para el 
+ * listado de colisiones. Se genera una ultima subventana que muestra
+ * los mensajes de incio y fin del programa.
+ * 
+ * Hebra:   w1_tabl_pth :(w1_tablero)       Ventana tablero.
+ *          w2_col_pth  :(w2_colisiones)    Ventana de colisiones.
+ *          w2_info_pth :(w2_info)          Ventana información global.
  */
-//create_message_w(Participant_list listp, WINDOW* w1, WINDOW *w2,int d,int i,struct Colision **colisiones
-/*
-pthread_mutex_t mutex_screen_2=PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  cond_colision=PTHREAD_COND_INITIALIZER;*/
 
 void *print_window(void *message){
     pthread_t w1_tabl_pth,w2_col_pth,w2_info_pth;
@@ -287,8 +297,19 @@ void *print_window(void *message){
     delwin(w1_tablero);
     delwin(w2_mensaje);
     delwin(w2_colisiones);
+    return NULL;
 }
 
+
+
+
+
+/**
+ * print_participant_list:
+ * 
+ * Función que muestra las partículas activas dentro de la simulación. 
+ * Recibe la ventana en donde se imprime. Se ejecuta bajo un thread.
+ */
 void *print_participant_list(void *message){
     int j,delay;
     Participant aux;
@@ -308,21 +329,28 @@ void *print_participant_list(void *message){
         pthread_mutex_unlock(&mutex_screen);
         pthread_mutex_unlock(&mutex_participant);
         usleep(delay);
-    } 
+    }
+    return NULL;
 }
+
+
+
+
+
+
 /**
  * print_colisiones:
  * 
  * Función que imprime los datos de las ultimas length_coll colisiones
- * dentro de la simulación en la pantalla w. 
+ * dentro de la simulación en la pantalla w. Se ejecuta bajo un thread.
  */
 void *print_colisiones(void *message){
-    int line,j,maxx,maxy,delay;
+    int line,j,maxx,delay;
     struct Colision *aux_col;
     WINDOW *w = ((struct Message_w*) message)->w1;
     struct Colision **colisiones = ((struct Message_w*) message)->colisiones;
     delay = ((struct Message_w*) message)->delay;
-    getmaxyx(w,maxy,maxx);
+    maxx = getmaxx(w);
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
         pthread_cond_wait(&cond_colision,&mutex_screen);
@@ -345,12 +373,23 @@ void *print_colisiones(void *message){
     return NULL;
 }
 
+
+
+
+
+
+/**
+ * print_info:
+ * 
+ * Función que muestra los datos globales de la simulación. Se ejecuta
+ * bajo un thread.
+ */
 void *print_info(void *message){
-    int maxx,maxy,delay;
+    int maxx,delay;
     WINDOW *w = ((struct Message_w*) message)->w1;
     Participant_list listp = ((struct Message_w*) message)->listp;
     delay = ((struct Message_w*) message)->delay;
-    getmaxyx(w,maxy,maxx);
+    maxx = getmaxx(w);
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
         mvwhline(w,1,0,' ',maxx);
@@ -368,6 +407,7 @@ void *print_info(void *message){
 
 
 
+
 /**
  * stop_ejec:
  * 
@@ -378,6 +418,7 @@ void *stop_ejec(void *message){
     while(wgetch(w2)!=27);
     pthread_cond_signal(&cond_colision);
     ejec_flag = 0;
+    return NULL;
 }
 
 
@@ -396,6 +437,7 @@ void print_participant(Participant p, WINDOW *w){
     wattroff(w,COLOR_PAIR(participant_get_id(p)%13+1));
 }
 
+/**---------------------------------------FUNCIONES DE CREACIÓN------------------------------------------------------**/
 
 
 
@@ -459,8 +501,16 @@ void init_setup(){
     init_pair(BLANCO_MAGENTA,COLOR_WHITE,COLOR_MAGENTA);
     init_pair(BLANCO_NEGRO,COLOR_WHITE,COLOR_BLACK);
     init_pair(BLANCO_AZUL,COLOR_WHITE,COLOR_BLUE);
+    init_pair(NEGRO_BLANCO,COLOR_BLACK,COLOR_WHITE);
     curs_set(FALSE);
 }
+/**
+ * Inicializadores de marcos de ventanas.
+ */
+
+
+
+
 void set_frame_w1(WINDOW *w){
     wattron(w,COLOR_PAIR(BLANCO));
     box(w,'*','*');
