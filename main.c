@@ -94,9 +94,9 @@ struct Colision *create_colision(int inst,int posx,int posy,int id1,int id2);
 void *stop_ejec(void *message);
 
 
-void print_info(WINDOW *w,Participant_list listp);
-void print_colisiones(WINDOW *w,struct Colision **colisiones);
-void print_participant_list(WINDOW *w, Participant_list listp);
+void *print_info(void *message);
+void *print_colisiones(void *message);
+void *print_participant_list(void *message);
 void set_frame_w1(WINDOW *w);
 void set_frame_w2(WINDOW *w);
 void set_msg_w2(WINDOW *w,int maxInstant);
@@ -108,6 +108,8 @@ int first_coll;                                                 //Posición de l
 int length_coll;                                                //Cantidad de colisiones a guardar (las n ultimas).
 pthread_mutex_t mutex_screen=PTHREAD_MUTEX_INITIALIZER;         //Mutex para sincronizar las ventanas.
 pthread_mutex_t mutex_participant=PTHREAD_MUTEX_INITIALIZER;    //Mutex para sincronizar el uso de lista de participantes.
+pthread_mutex_t mutex_screen_2=PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  cond_colision=PTHREAD_COND_INITIALIZER;
 int ejec_flag = 1;
 /**
  * Parametros de inicio:
@@ -155,7 +157,7 @@ int main(int args, char **argv){
         pthread_create(&thread_participant[j],NULL,&move_participant_list,(void *)participant_message[j]);
     }
     pthread_join(thread_screen1, NULL);
-    pthread_join(thread_ejec,NULL);;
+    pthread_join(thread_ejec,NULL);
     for(j=0;j<k;j++)
         pthread_join(thread_participant[j],NULL);
     participant_list_free(list);
@@ -209,12 +211,13 @@ void *move_participant_list(void * message){
             first_coll = ((first_coll - 1)<0?length_coll+(first_coll - 1):first_coll - 1)% length_coll;
             if(colisiones[first_coll]!=NULL) free(colisiones[first_coll]);
             colisiones[first_coll] = \
-                create_colision(INSTANT,\
+                            create_colision(INSTANT,\
                                 participant_get_x(p),\
                                 participant_get_y(p),\
                                 participant_get_id(p),\
                                 participant_get_id(aux));
             COLISIONES = COLISIONES + 1;
+            pthread_cond_signal(&cond_colision);
             aux=NULL;
         }
         INSTANT = INSTANT + 1;
@@ -236,15 +239,24 @@ void *move_participant_list(void * message){
  * dos mutex, uno para asegurar el uso único de la ventana y el otro para
  * asegurar el uso único de la lista de participantes. 
  */
+//create_message_w(Participant_list listp, WINDOW* w1, WINDOW *w2,int d,int i,struct Colision **colisiones
+/*
+pthread_mutex_t mutex_screen_2=PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  cond_colision=PTHREAD_COND_INITIALIZER;*/
+
 void *print_window(void *message){
+    pthread_t w1_tabl_pth,w2_col_pth,w2_info_pth;
+    struct Message_w *m_pl,*m_col,*m_info;
     int delay,maxInstant,w1_mx,w1_my,w2_mx,w2_my;
     Participant_list listp;
+    struct Colision **colisiones;
     WINDOW *w1,*w2,*w1_tablero,*w2_colisiones,*w2_mensaje,*w2_info;
     listp       = ((struct Message_w*) message)->listp;
     w1  = ((struct Message_w*) message)->w1;
     w2  = ((struct Message_w*) message)->w2;
     delay       = ((struct Message_w*) message)->delay;
     maxInstant  = ((struct Message_w*) message)->maxInstant;
+    colisiones  = ((struct Message_w*) message)->colisiones;
     getmaxyx(w1,w1_my,w1_mx);
     getmaxyx(w2,w2_my,w2_mx);
     w1_tablero      = derwin(w1,w1_my-2,w1_mx-2,1,1);
@@ -254,38 +266,49 @@ void *print_window(void *message){
     set_frame_w1(w1);
     set_frame_w2(w2);
     set_msg_w2(w2_mensaje,maxInstant);
-    while(ejec_flag){
-        pthread_mutex_lock(&mutex_participant);
-        print_participant_list(w1_tablero,listp);
-        print_info(w2_info,listp);
-        print_colisiones(w2_colisiones,((struct Message_w*) message)->colisiones);
-        pthread_mutex_unlock(&mutex_screen);
-        doupdate();
-        usleep(delay/2);
-    }
+    m_pl    = create_message_w(listp,w1_tablero,NULL,delay,maxInstant,NULL);
+    m_col   = create_message_w(NULL,w2_colisiones,NULL,delay,maxInstant,colisiones);
+    m_info  = create_message_w(listp,w2_info,NULL,delay,maxInstant,NULL);
+    pthread_create(&w1_tabl_pth,NULL,&print_participant_list,(void *) m_pl);
+    pthread_create(&w2_col_pth,NULL,&print_colisiones,(void *) m_col);
+    pthread_create(&w2_info_pth,NULL,&print_info,(void *)m_info);
+    pthread_join(w2_col_pth, NULL);
+    pthread_join(w1_tabl_pth, NULL);
+    pthread_join(w2_info_pth,NULL);
     mvwhline(w2_mensaje,0,0,' ',w2_mx-3);
     mvwhline(w2_mensaje,1,0,' ',w2_mx-3);
     mvwprintw(w2_mensaje,0,0," Simulacion ejecutada con exito.");
     mvwprintw(w2_mensaje,1,0," Presione ESC para salir.");
     wrefresh(w2_mensaje);
     while(wgetch(w2_mensaje)!=27);
+    free(m_pl);
+    free(m_col);
+    free(m_info);
     delwin(w1_tablero);
     delwin(w2_mensaje);
     delwin(w2_colisiones);
 }
 
-void print_participant_list(WINDOW *w, Participant_list listp){
-    int j;
+void *print_participant_list(void *message){
+    int j,delay;
     Participant aux;
-    wclear(w);
-    pthread_mutex_lock(&mutex_screen);
-    for(j=0;j<participant_list_get_length(listp);j++){
-        aux = participant_list_get(listp,j);
-        if(participant_get_particleNum(aux)!=0)
-            print_participant(aux,w);
-    }
-    wnoutrefresh(w);
-    pthread_mutex_unlock(&mutex_participant);
+    WINDOW *w = ((struct Message_w*) message)->w1;
+    Participant_list listp=((struct Message_w*) message)->listp;
+    delay = ((struct Message_w*) message)->delay;
+    while(ejec_flag){
+        wclear(w);
+        pthread_mutex_lock(&mutex_screen);
+        pthread_mutex_lock(&mutex_participant);
+        for(j=0;j<participant_list_get_length(listp);j++){
+            aux = participant_list_get(listp,j);
+            if(participant_get_particleNum(aux)!=0)
+                print_participant(aux,w);
+        }
+        wnoutrefresh(w);
+        pthread_mutex_unlock(&mutex_screen);
+        pthread_mutex_unlock(&mutex_participant);
+        usleep(delay);
+    } 
 }
 /**
  * print_colisiones:
@@ -293,35 +316,53 @@ void print_participant_list(WINDOW *w, Participant_list listp){
  * Función que imprime los datos de las ultimas length_coll colisiones
  * dentro de la simulación en la pantalla w. 
  */
-void print_colisiones(WINDOW *w,struct Colision **colisiones){
-    int line;
-    int j;
-    int maxx,maxy;
+void *print_colisiones(void *message){
+    int line,j,maxx,maxy,delay;
     struct Colision *aux_col;
-    line = 0;
+    WINDOW *w = ((struct Message_w*) message)->w1;
+    struct Colision **colisiones = ((struct Message_w*) message)->colisiones;
+    delay = ((struct Message_w*) message)->delay;
     getmaxyx(w,maxy,maxx);
-    j = first_coll;
-    wclear(w);
-    do{
-        if(colisiones[j]!=NULL){
-            aux_col = colisiones[j];
-            mvwhline(w,line,0,' ',maxx-3);
-            mvwprintw(w,line,0," Colision -> I: %8d|(x,y): (%3d,%3d)| %2d -><- %2d",aux_col->instante,aux_col->posX,aux_col->posY,aux_col->id1,aux_col->id2);
-            line+=1;
-        }
-        j=(j+1)%length_coll; 
-    }while(j!=first_coll && colisiones[j]!=NULL);
-    wnoutrefresh(w);
+    while(ejec_flag){
+        pthread_mutex_lock(&mutex_screen);
+        pthread_cond_wait(&cond_colision,&mutex_screen);
+        j = first_coll;
+        line = 0;
+        wclear(w);
+        do{
+            if(colisiones[j]!=NULL){
+                aux_col = colisiones[j];
+                mvwhline(w,line,0,' ',maxx-3);
+                mvwprintw(w,line,0," Colision -> I: %8d|(x,y): (%3d,%3d)| %2d -><- %2d",aux_col->instante,aux_col->posX,aux_col->posY,aux_col->id1,aux_col->id2);
+                line+=1;
+            }
+            j=(j+1)%length_coll; 
+        }while(j!=first_coll && colisiones[j]!=NULL);
+        wnoutrefresh(w);
+        pthread_mutex_unlock(&mutex_screen);
+        usleep(delay);
+    }
+    return NULL;
 }
 
-void print_info(WINDOW *w,Participant_list listp){
-    int maxx,maxy;
+void *print_info(void *message){
+    int maxx,maxy,delay;
+    WINDOW *w = ((struct Message_w*) message)->w1;
+    Participant_list listp = ((struct Message_w*) message)->listp;
+    delay = ((struct Message_w*) message)->delay;
     getmaxyx(w,maxy,maxx);
-    mvwhline(w,1,0,' ',maxx);
-    mvwprintw(w,1,0," Instante actual: %10d",INSTANT);
-    mvwhline(w,2,0,' ',maxx);
-    mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,participant_list_get_numActive(listp));
-    wnoutrefresh(w);
+    while(ejec_flag){
+        pthread_mutex_lock(&mutex_screen);
+        mvwhline(w,1,0,' ',maxx);
+        mvwprintw(w,1,0," Instante actual: %10d",INSTANT);
+        mvwhline(w,2,0,' ',maxx);
+        mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,participant_list_get_numActive(listp));
+        wnoutrefresh(w);
+        doupdate();
+        pthread_mutex_unlock(&mutex_screen);
+        usleep(delay);
+    }
+    return NULL;
 }
 
 
@@ -335,6 +376,7 @@ void print_info(WINDOW *w,Participant_list listp){
 void *stop_ejec(void *message){
     WINDOW *w2  = ((struct Message_w*) message)->w2;
     while(wgetch(w2)!=27);
+    pthread_cond_signal(&cond_colision);
     ejec_flag = 0;
 }
 
