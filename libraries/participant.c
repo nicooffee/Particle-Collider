@@ -56,7 +56,6 @@ struct Participant{
  */
 Participant participant_create(int parNum, int participant , int maxx, int maxy, int minx, int miny){
     struct Participant *new;
-    int pos = participant%4;
     new = (struct Participant*) calloc(1,sizeof(struct Participant));
     new->id = participant;
     new->particleNum = parNum;
@@ -87,7 +86,7 @@ Participant participant_create(int parNum, int participant , int maxx, int maxy,
 void participant_reset_position(Participant p){
     int pos;
     int maxx,maxy;
-    if (p==NULL) return;
+    if (p==NULL || p->particleNum==0) return;
     pos = p->id % 4;
     maxx = p->maxX;
     maxy = p->maxY;
@@ -173,7 +172,6 @@ void participant_particle_collided(Participant p){
     if(p==NULL || p->particleNum<=0)
         return;
     p->particleNum = p->particleNum - 1;
-    if(p->particleNum>0) participant_reset_position(p);
     return;
 }
 
