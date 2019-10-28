@@ -446,9 +446,9 @@ void *stop_ejec(void *message){
  * de un participante en la ventana w.
  */
 void print_participant(Participant p, WINDOW *w){
-    wattron(w,COLOR_PAIR(participant_get_id(p)%13+1));
+    wattron(w,COLOR_PAIR(participant_get_id(p)%4+1));
     mvwprintw(w,participant_get_y(p),participant_get_x(p),"*");
-    wattroff(w,COLOR_PAIR(participant_get_id(p)%13+1));
+    wattroff(w,COLOR_PAIR(participant_get_id(p)%4+1));
 }
 
 /**---------------------------------------FUNCIONES DE CREACIÓN------------------------------------------------------**/
@@ -524,18 +524,33 @@ void init_setup(){
 
 
 void set_frame_w1(WINDOW *w){
+    int maxx,maxy;
+    getmaxyx(w,maxy,maxx);
     wattron(w,COLOR_PAIR(BLANCO));
     box(w,'*','*');
     wattroff(w,COLOR_PAIR(BLANCO));
+    wattron(w,COLOR_PAIR(ROJO));
+    mvwvline(w,1,0,' ',maxy-2);
+    wattroff(w,COLOR_PAIR(ROJO));
+    wattron(w,COLOR_PAIR(VERDE));
+    mvwhline(w,maxy-1,1,' ',maxx-2);
+    wattroff(w,COLOR_PAIR(VERDE));
+    wattron(w,COLOR_PAIR(AMARILLO));
+    mvwvline(w,1,maxx-1,' ',maxy-2);
+    wattroff(w,COLOR_PAIR(AMARILLO));
+    wattron(w,COLOR_PAIR(CYAN));
+    mvwhline(w,0,1,' ',maxx-2);
+    wattroff(w,COLOR_PAIR(CYAN));
+    
     wnoutrefresh(w);
 }
 void set_frame_w2(WINDOW *w){
     int maxy,maxx;
     getmaxyx(w,maxy,maxx);
     mvwvline(w,1,1,'|',maxy-2);
-    wattron(w,COLOR_PAIR(BLANCO_CYAN));
+    wattron(w,COLOR_PAIR(BLANCO_MAGENTA));
     box(w,'*','*');
-    wattroff(w,COLOR_PAIR(BLANCO_CYAN));
+    wattroff(w,COLOR_PAIR(BLANCO_MAGENTA));
     mvwhline(w,5,2,'-',maxx-3);
     wattron(w,COLOR_PAIR(BLANCO_VERDE));
     mvwhline(w,maxy-7,1,'-',maxx-2);
