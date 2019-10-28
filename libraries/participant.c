@@ -1,8 +1,8 @@
 
 /**
- * Librería participant.
+ * Módulo participant.
  * 
- * Dentro de esta librería se construye el dato para simular un participante
+ * Dentro de este módulo se construye el dato para simular un participante
  * singular dentro de la simulación, como también las funciones para editar sus datos.
  * El dato Participant es independiente de la existencia de otros Participant dentro
  * de la misma posición. Se utiliza un puntero opaco para abstraer a los módulos externos
@@ -22,7 +22,7 @@
  *  posX, posY    : Posición actual.
  *  minX, minY    : Limites inferiores para posX y posY
  *  maxX, maxY    : Limites superiores para posX y posY
- *  dirX, DirY    : Direcciones de movimiento para eje x e y.
+ *  dirX, DirY    : Direcciones de movimiento para eje X e Y.
  */
 struct Participant{
     int id;
@@ -49,8 +49,8 @@ struct Participant{
  * 
  * In:  parNum      : Cantidad de particulas.
  *      participant : ID del participante.
- *      maxx        : Limite del eje X.
- *      maxy        : Limite del eje Y.
+ *      maxx,maxy   : Limite superior del eje X e Y.
+ *      minx,miny   : Limite inferior del eje X e Y.
  * 
  * Out: new         : Participante generado.
  */

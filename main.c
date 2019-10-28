@@ -34,11 +34,14 @@
 /**-------------------------------------------ESTRUCTURAS------------------------------------------------------------**/
 /**
  * struct Message_w
- * Estructura para enviar los datos que utilizan las funciones del manejo de la ventana 1.
+ * Estructura para enviar los datos que utilizan las funciones del manejo de la ventana.
  * 
- * listp    : Lista de participantes.
- * w        : ventana donde se muestran los participantes.
- * delay    : Delay de refresco de la ventana.
+ * listp        : Lista de participantes.
+ * w1           : Ventana donde se muestran los participantes.
+ * w2           : Ventana de colisiones, información, etc.
+ * delay        : Delay de refresco de la ventana.
+ * maxInstant   : Máximo instante de ejecución.
+ * colisiones   : Puntero a listado de colisiones.
  */
 struct Message_w{
     Participant_list listp;
@@ -57,6 +60,7 @@ struct Message_w{
  * id           : ID del participante a manejar
  * delay        : Delay del participante.
  * maxInstant   : Máximo de instantes permitidos en la simulación.
+ * colisiones   : Puntero a listado de colisiones.
  */
 struct Message_p{
     Participant_list listp;
@@ -115,9 +119,16 @@ int ejec_flag = 1;                                              //Flag general d
 /**
  * main:
  * 
- * Se genera la lista de participantes, se crean los threads respectivos
+ * Se inicializan variables necesarias, se crean los threads respectivos
  * para que la simulación se ejecute. Luego de ejecutar la simulación, se
  * libera la memoria utilizada por las varibles respectivas.
+ * 
+ * La ventana se divide en dos. En w_particle se muestra el movimiento de
+ * las partículas. En w_data se muestran los datos globales, listado de 
+ * últimas n colisiones e información adicional.
+ * 
+ * La cantidad de colisiones mostradas es el largo de la pantalla menos 13
+ * lineas (El largo de la sub-ventana de colisiones).
  * 
  * Parametros de inicio:
  *  - n:    Cantidad de particulas de cada participante.
@@ -196,6 +207,9 @@ int main(int args, char **argv){
  * un mutex para asegurar la exclusión mutua al mover o colisionar con otra
  * partícula. Esta función finaliza su ejecución cuando el participante no posee
  * partículas o cuando el instante de la simulación supera al máximo definido.
+ * 
+ * Esta función se ejecuta en n hebras, para n participantes. Cada hebra maneja
+ * un único participante.
  */
 void *move_participant_list(void * message){
     Participant aux=NULL;
@@ -507,8 +521,6 @@ void init_setup(){
 /**
  * Inicializadores de marcos de ventanas.
  */
-
-
 
 
 void set_frame_w1(WINDOW *w){

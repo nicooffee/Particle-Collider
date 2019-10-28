@@ -1,10 +1,10 @@
 /**
- * Librería participant_list:
+ * Módulo participant_list:
  * 
- * Dentro de esta librería se construye el dato para simular el listado
+ * Dentro de este módulo se construye el dato para simular el listado
  * de participantes de la simulación, como también las funciones para manejarlo.
- * Dentro de esta librería se mueven los participantes, tomando en cuenta las
- * colisiones con otros participantes. Esta librería es independiente de el espacio
+ * Dentro de este módulo se mueven los participantes, tomando en cuenta las
+ * colisiones con otros participantes. Este módulo es independiente de el espacio
  * donde se utilizará el listado de participantes. Se utiliza puntero opaco para 
  * abstraer a los módulos externos sobre el funcionamiento de la lista.
  */
@@ -43,8 +43,8 @@ struct Participant_list{
  * en los bordes[2*((maxx-minx)+(maxy-miny))-4], se limitará a 2*((maxx-minx)+(maxy-miny))-4.
  * In:  n           : Cantidad de participantes a generar.
  *      numParticle : Numero de partículas de cada participante.
- *      maxx        : Límite para el eje X de cada participante.
- *      maxy        : Límite para el eje Y de cada participante.
+ *      maxx,maxy   : Límites superiores para el eje X e Y de cada participante.
+ *      minx,miny   : Límites inferiores para el eje X e Y de cada participante.
  * 
  * Ou:  new         : Listado con los participantes en su posición inicial.
  */
@@ -72,13 +72,17 @@ Participant_list participant_list_create(int n,int numParticle, int maxx,int max
  * 
  * Función que mueve un participante según una id dada. Comprueba si existen
  * colisiones y llama a participant_particle_collided si existe tal situación.
+ * Si existe colisión, se asigna en coll el puntero a tal participante.
  * 
  * In:  listp   : Listado de participantes.
  *      id      : ID del participante a mover.
+ *      coll    : Puntero a Participant.
  * 
  * Ou:  valores : 0 -> no hubo movimiento para id.
- *                1 -> Se movió el participante y no hubo colisión.
- *                id -> Se movió el participante y si hubo colisión.
+ *                1 -> Se movió el participante.
+ *      
+ *      coll    : NULL -> No hubo colisión
+ *                Participante con el que colisionó p luego de moverse.
  */
 int participant_list_move(Participant_list listp,Participant p,Participant *coll){ 
     int pp,pc;
@@ -110,7 +114,7 @@ int participant_list_move(Participant_list listp,Participant p,Participant *coll
  *      p       : Participante a comprobar.
  *
  * Ou: valores  : Participante con el que hace colisión.
- *                NULL si no hace colisión con nadie.  
+ *                NULL si no hace colisión.  
  */
 Participant participant_list_collision(Participant_list listp,Participant p){
     int i = 0;
