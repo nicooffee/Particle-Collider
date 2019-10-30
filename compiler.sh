@@ -1,2 +1,2 @@
 gcc main.c libraries/participant.c libraries/participant_list.c -Wall -lncurses -pthread &&\
-./a.out 1000 8 -1 16666;
+./a.out 10000000 50 -1 40000;

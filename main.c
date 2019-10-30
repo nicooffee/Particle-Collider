@@ -304,10 +304,10 @@ void *print_window(void *message){
     mvwprintw(w2_mensaje,0,0," Simulacion ejecutada con exito.");
     mvwprintw(w2_mensaje,1,0," Presione ESC para salir.");
     wrefresh(w2_mensaje);
-    while(wgetch(w2_mensaje)!=27);
     free(m_pl);
     free(m_col);
     free(m_info);
+    while(wgetch(w2_mensaje)!=27);
     delwin(w1_tablero);
     delwin(w2_mensaje);
     delwin(w2_colisiones);
@@ -359,23 +359,27 @@ void *print_participant_list(void *message){
  * dentro de la simulación en la pantalla w. Se ejecuta bajo un thread.
  */
 void *print_colisiones(void *message){
-    int line,j,maxx,delay;
+    int line,j,maxx,delay,lA,lB,lC;
     struct Colision *aux_col;
     WINDOW *w = ((struct Message_w*) message)->w1;
     struct Colision **colisiones = ((struct Message_w*) message)->colisiones;
     delay = ((struct Message_w*) message)->delay;
     maxx = getmaxx(w);
+    lA = (maxx)*50/100;
+    lB = (maxx)*20/100;
+    lC = (maxx)*15/100;
+    lA += maxx - (lA+lB+(lC*2));
+    mvwprintw(w,0,0,"|%-*s|(% -*s,% *s)|%-*s|%-*s|",lA-1,"Instante",((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,"Eje X",(lB-2)/2-2,"Eje Y",lC-1,"P1",lC-1,"P2");
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
         pthread_cond_wait(&cond_colision,&mutex_screen);
         j = first_coll;
-        line = 0;
-        wclear(w);
+        line = 1;
         do{
             if(colisiones[j]!=NULL){
                 aux_col = colisiones[j];
                 mvwhline(w,line,0,' ',maxx-3);
-                mvwprintw(w,line,0," Colision -> I: %8d|(x,y): (%3d,%3d)| %2d -><- %2d",aux_col->instante,aux_col->posX,aux_col->posY,aux_col->id1,aux_col->id2);
+                mvwprintw(w,line,0,"|%-*d|(%-*d,%*d)|%-*d|%-*d|",lA-1,aux_col->instante,((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,aux_col->posX,(lB-2)/2-2,aux_col->posY,lC-1,aux_col->id1,lC-1,aux_col->id2);
                 line+=1;
             }
             j=(j+1)%length_coll; 
@@ -551,7 +555,7 @@ void set_frame_w2(WINDOW *w){
     wattron(w,COLOR_PAIR(BLANCO_MAGENTA));
     box(w,'*','*');
     wattroff(w,COLOR_PAIR(BLANCO_MAGENTA));
-    mvwhline(w,5,2,'-',maxx-3);
+    mvwhline(w,5,2,((char) 126),maxx-3);
     wattron(w,COLOR_PAIR(BLANCO_VERDE));
     mvwhline(w,maxy-7,1,'-',maxx-2);
     wattroff(w,COLOR_PAIR(BLANCO_VERDE));
