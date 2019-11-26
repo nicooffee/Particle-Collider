@@ -168,12 +168,13 @@ int main(int args, char **argv){
     screen_message =        create_message_w(list,w_particle,w_data,d,i,colisiones);
     thread_participant =    (pthread_t*) calloc(k,sizeof(pthread_t));
     participant_message =   (struct Message_p**) calloc(k,sizeof(struct Message_p*));
-    pthread_create(&thread_screen1,NULL,&print_window,(void *) screen_message);
-    pthread_create(&thread_ejec,NULL,&stop_ejec,(void *) screen_message);
     for(j=0;j<k;j++){
         participant_message[j] = create_message_p(list,participant_list_get(list,j),d,i,colisiones);
         pthread_create(&thread_participant[j],NULL,&move_participant_list,(void *)participant_message[j]);
     }
+    usleep(100);
+    pthread_create(&thread_screen1,NULL,&print_window,(void *) screen_message);
+    pthread_create(&thread_ejec,NULL,&stop_ejec,(void *) screen_message);
     pthread_join(thread_screen1, NULL);
     pthread_join(thread_ejec,NULL);
     for(j=0;j<k;j++)
@@ -335,9 +336,9 @@ void *print_participant_list(void *message){
     delay = ((struct Message_w*) message)->delay;
     getmaxyx(w,maxy,maxx);
     while(ejec_flag){
-        wclear(w);
-        while(j++<maxx) mvwvline(w,0,j,' ',maxy);
         pthread_mutex_lock(&mutex_screen);
+        j=0;
+        while(j<maxx) mvwvline(w,0,j++,' ',maxy);
         pthread_mutex_lock(&mutex_participant);
         for(j=0;j<participant_list_get_length(listp);j++){
             aux = participant_list_get(listp,j);
