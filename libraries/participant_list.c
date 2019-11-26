@@ -49,7 +49,7 @@ struct Participant_list{
  * Ou:  new         : Listado con los participantes en su posición inicial.
  */
 Participant_list participant_list_create(int n,int numParticle, int maxx,int maxy, int minx, int miny){
-    int i=0;
+    register int i=0;
     struct Participant_list *new;
     new = (struct Participant_list *) calloc(1,sizeof(struct Participant_list));
     new->list = (Participant *) calloc(n,sizeof(Participant));
@@ -90,10 +90,8 @@ int participant_list_move(Participant_list listp,Participant p,Participant *coll
     if(participant_move(p)){
         (*coll) = participant_list_collision(listp,p);
         if((*coll)==NULL) return 1;
-        participant_particle_collided(p);
-        participant_particle_collided((*coll));
-        pp = participant_get_particleNum(p);
-        pc = participant_get_particleNum((*coll));
+        pp = (participant_particle_collided(p), participant_get_particleNum(p));
+        pc = (participant_particle_collided((*coll)), participant_get_particleNum((*coll)));
         listp->numActive -= ((pp<=0?1:0) + (pc<=0?1:0));
         return 1;
     }
@@ -117,7 +115,7 @@ int participant_list_move(Participant_list listp,Participant p,Participant *coll
  *                NULL si no hace colisión.  
  */
 Participant participant_list_collision(Participant_list listp,Participant p){
-    int i = 0;
+    register int i = 0;
     int posX = participant_get_x(p);
     int posY = participant_get_y(p);
     int id = participant_get_id(p);

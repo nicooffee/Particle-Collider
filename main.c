@@ -31,6 +31,7 @@
 #define BLANCO_AZUL     14
 #define BLANCO_NEGRO    15
 
+
 /**-------------------------------------------ESTRUCTURAS------------------------------------------------------------**/
 /**
  * struct Message_w
@@ -144,7 +145,7 @@ int main(int args, char **argv){
     Participant_list list;
     WINDOW *w_particle,*w_data;
     int n,k,i,d;
-    int j;
+    register int j;
     int maxx,maxy;
     int maxx_p,maxy_p;
     if(args < 5){
@@ -325,13 +326,17 @@ void *print_window(void *message){
  * Recibe la ventana en donde se imprime. Se ejecuta bajo un thread.
  */
 void *print_participant_list(void *message){
-    int j,delay;
+    register int j=0;
+    int delay;
+    int maxx,maxy;
     Participant aux;
     WINDOW *w = ((struct Message_w*) message)->w1;
     Participant_list listp=((struct Message_w*) message)->listp;
     delay = ((struct Message_w*) message)->delay;
+    getmaxyx(w,maxy,maxx);
     while(ejec_flag){
         wclear(w);
+        while(j++<maxx) mvwvline(w,0,j,' ',maxy);
         pthread_mutex_lock(&mutex_screen);
         pthread_mutex_lock(&mutex_participant);
         for(j=0;j<participant_list_get_length(listp);j++){
@@ -369,7 +374,7 @@ void *print_colisiones(void *message){
     lB = (maxx)*20/100;
     lC = (maxx)*15/100;
     lA += maxx - (lA+lB+(lC*2));
-    mvwprintw(w,0,0,"|%-*s|(% -*s,% *s)|%-*s|%-*s|",lA-1,"Instante",((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,"Eje X",(lB-2)/2-2,"Eje Y",lC-1,"P1",lC-1,"P2");
+    mvwprintw(w,0,0,"|%-*s|(% -*s,% *s)|%-*s|%-*s|",lA-1,"Instante",((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,"X",(lB-2)/2-2,"Y",lC-1,"P1",lC-1,"P2");
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
         pthread_cond_wait(&cond_colision,&mutex_screen);
@@ -561,6 +566,8 @@ void set_frame_w2(WINDOW *w){
     wattroff(w,COLOR_PAIR(BLANCO_VERDE));
     wnoutrefresh(w);
 }
+
+
 void set_msg_w2(WINDOW *w,int maxInstant){
     mvwprintw(w,0,0," Ejecucion en modo: ");
     if(maxInstant==-1){
