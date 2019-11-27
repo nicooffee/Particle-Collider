@@ -172,7 +172,7 @@ int main(int args, char **argv){
         participant_message[j] = create_message_p(list,participant_list_get(list,j),d,i,colisiones);
         pthread_create(&thread_participant[j],NULL,&move_participant_list,(void *)participant_message[j]);
     }
-    usleep(100);
+    //usleep(100000);
     pthread_create(&thread_screen1,NULL,&print_window,(void *) screen_message);
     pthread_create(&thread_ejec,NULL,&stop_ejec,(void *) screen_message);
     pthread_join(thread_screen1, NULL);
@@ -327,7 +327,7 @@ void *print_window(void *message){
  * Recibe la ventana en donde se imprime. Se ejecuta bajo un thread.
  */
 void *print_participant_list(void *message){
-    register int j=0;
+    register int j=0,rfrsh=-1,intv=1;
     int delay;
     int maxx,maxy;
     Participant aux;
@@ -337,8 +337,12 @@ void *print_participant_list(void *message){
     getmaxyx(w,maxy,maxx);
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
-        j=0;
-        while(j<maxx) mvwvline(w,0,j++,' ',maxy);
+        if((rfrsh++,rfrsh%intv==0)) (intv*=2,rfrsh=0,wclear(w));
+        else{
+            j=0;
+            while(j<maxx) mvwvline(w,0,j++,' ',maxy);
+        }
+        
         pthread_mutex_lock(&mutex_participant);
         for(j=0;j<participant_list_get_length(listp);j++){
             aux = participant_list_get(listp,j);
@@ -551,7 +555,6 @@ void set_frame_w1(WINDOW *w){
     wattron(w,COLOR_PAIR(CYAN));
     mvwhline(w,0,1,' ',maxx-2);
     wattroff(w,COLOR_PAIR(CYAN));
-    
     wnoutrefresh(w);
 }
 void set_frame_w2(WINDOW *w){
