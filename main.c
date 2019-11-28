@@ -91,6 +91,7 @@ struct Colision{
 };
 /**-----------------------------------------------PROTOTIPOS---------------------------------------------------------**/
 void init_setup();
+void reset_color();
 void *move_participant_list(void * message);
 struct Message_p *create_message_p(Participant_list listp,Participant p,int delay,int maxInstantm,struct Colision **colisiones);
 struct Message_w *create_message_w(Participant_list listp, WINDOW *w1,WINDOW *w2,int d,int i,struct Colision **colisiones);
@@ -193,6 +194,7 @@ int main(int args, char **argv){
             free(colisiones[j]);
     free(colisiones);
     free(participant_message);
+    reset_color();
     delwin(w_data);
     delwin(w_particle);
     endwin();
@@ -523,7 +525,7 @@ void init_setup(){
     srand((unsigned) time(NULL));   
     noecho();
     start_color();
-    if(!can_change_color()){
+    if(can_change_color()){
         init_color(COLOR_RED,       RGB(255),RGB(102),RGB(178));
         init_color(COLOR_GREEN,     RGB(255),RGB(102),RGB(255));
         init_color(COLOR_YELLOW,    RGB(178),RGB(102),RGB(255));
@@ -549,6 +551,21 @@ void init_setup(){
     init_pair(BLANCO_AZUL,COLOR_WHITE,COLOR_BLUE);
     init_pair(NEGRO_BLANCO,COLOR_BLACK,COLOR_WHITE);
     curs_set(FALSE);
+}
+
+
+void reset_color(){
+    if(can_change_color()){
+        init_color(COLOR_RED,    (680),(0),(0));
+        init_color(COLOR_GREEN,  (0),(680),(0));
+        init_color(COLOR_YELLOW, (680),(680),(0));
+        init_color(COLOR_BLUE,   (0),(0),(680));
+        init_color(COLOR_CYAN,   (0),(680),(680));
+        init_color(COLOR_MAGENTA,(680),(0),(680));
+        init_color(COLOR_BLACK,  (0),(0),(0));
+        init_color(COLOR_WHITE,  (680),(680),(680));
+    }
+    return;
 }
 /**
  * Inicializadores de marcos de ventanas.
