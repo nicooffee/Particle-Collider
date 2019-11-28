@@ -15,6 +15,7 @@
 #include "libraries/participant_list.h"
 #include "libraries/participant.h"
 
+#define RGB(x) (x*1000/255)
 #define ROJO        1
 #define VERDE       2
 #define AMARILLO    3
@@ -337,12 +338,11 @@ void *print_participant_list(void *message){
     getmaxyx(w,maxy,maxx);
     while(ejec_flag){
         pthread_mutex_lock(&mutex_screen);
-        if((rfrsh++,rfrsh%intv==0)) (intv*=2,rfrsh=0,wclear(w));
+        if((rfrsh++,rfrsh%intv==0)) (intv*=(intv>1000000?1:2),rfrsh=0,wclear(w));
         else{
             j=0;
             while(j<maxx) mvwvline(w,0,j++,' ',maxy);
         }
-        
         pthread_mutex_lock(&mutex_participant);
         for(j=0;j<participant_list_get_length(listp);j++){
             aux = participant_list_get(listp,j);
@@ -356,7 +356,6 @@ void *print_participant_list(void *message){
     }
     return NULL;
 }
-
 
 
 
@@ -381,10 +380,10 @@ void *print_colisiones(void *message){
     lA += maxx - (lA+lB+(lC*2));
     mvwprintw(w,0,0,"|%-*s|(% -*s,% *s)|%-*s|%-*s|",lA-1,"Instante",((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,"X",(lB-2)/2-2,"Y",lC-1,"P1",lC-1,"P2");
     while(ejec_flag){
+        line = 1;
         pthread_mutex_lock(&mutex_screen);
         pthread_cond_wait(&cond_colision,&mutex_screen);
         j = first_coll;
-        line = 1;
         do{
             if(colisiones[j]!=NULL){
                 aux_col = colisiones[j];
@@ -413,7 +412,7 @@ void *print_colisiones(void *message){
  * bajo un thread.
  */
 void *print_info(void *message){
-    int maxx,delay;
+    int maxx,delay,*cPerId,i;
     WINDOW *w = ((struct Message_w*) message)->w1;
     Participant_list listp = ((struct Message_w*) message)->listp;
     delay = ((struct Message_w*) message)->delay;
@@ -423,12 +422,21 @@ void *print_info(void *message){
         mvwhline(w,1,0,' ',maxx);
         mvwprintw(w,1,0," Instante actual: %10d",INSTANT);
         mvwhline(w,2,0,' ',maxx);
+        pthread_mutex_lock(&mutex_participant);
+        participant_list_get_arrActive(listp,&cPerId);
         mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,participant_list_get_numActive(listp));
+        pthread_mutex_unlock(&mutex_participant);
+        for(i=1;i<=4;i++){
+            wattron(w,COLOR_PAIR(i+7));
+            mvwprintw(w,3,1+maxx*(i-1)/4,"P %d: %03d",i,cPerId[i-1]);
+            wattroff(w,COLOR_PAIR(i+7));
+        }
         wnoutrefresh(w);
         doupdate();
         pthread_mutex_unlock(&mutex_screen);
         usleep(delay);
     }
+    if(cPerId!=NULL) free(cPerId);
     return NULL;
 }
 
@@ -515,6 +523,16 @@ void init_setup(){
     srand((unsigned) time(NULL));   
     noecho();
     start_color();
+    if(!can_change_color()){
+        init_color(COLOR_RED,       RGB(255),RGB(102),RGB(178));
+        init_color(COLOR_GREEN,     RGB(255),RGB(102),RGB(255));
+        init_color(COLOR_YELLOW,    RGB(178),RGB(102),RGB(255));
+        init_color(COLOR_BLUE,      RGB(0),RGB(0),RGB(153));
+        init_color(COLOR_CYAN,      RGB(102),RGB(102),RGB(255));
+        init_color(COLOR_MAGENTA,   RGB(102),RGB(0),RGB(102));
+        init_color(COLOR_BLACK,     RGB(0),RGB(0),RGB(0));
+        init_color(COLOR_WHITE,     RGB(255),RGB(255),RGB(255));
+    }
     init_pair(ROJO,COLOR_RED,COLOR_RED);
     init_pair(VERDE,COLOR_GREEN,COLOR_GREEN);
     init_pair(AMARILLO,COLOR_YELLOW,COLOR_YELLOW);
@@ -575,9 +593,9 @@ void set_frame_w2(WINDOW *w){
 void set_msg_w2(WINDOW *w,int maxInstant){
     mvwprintw(w,0,0," Ejecucion en modo: ");
     if(maxInstant==-1){
-        wattron(w,COLOR_PAIR(BLANCO_ROJO));
+        wattron(w,COLOR_PAIR(BLANCO_AZUL));
         wprintw(w,"indefinido.");
-        wattroff(w,COLOR_PAIR(BLANCO_ROJO));
+        wattroff(w,COLOR_PAIR(BLANCO_AZUL));
     } 
     else{
         wattron(w,COLOR_PAIR(BLANCO_VERDE));

@@ -186,6 +186,27 @@ int participant_list_get_numActive(Participant_list listp){
 
 
 /**
+ * participant_list_get_arrActive:
+ * 
+ * Función que recibe un doble puntero a int, cuenta los participantes
+ * por id%4 y los guarda en tal puntero.
+ * 
+ * La función asume que el doble puntero es NULl o un arreglo de largo
+ * 4.
+ */
+void participant_list_get_arrActive(Participant_list listp,int **c){
+    register int i;
+    if((*c)==NULL) (*c) = (int *) malloc(4*sizeof(int));
+    for(i=0;i<4;i++) (*c)[i] = 0;
+    for(i = 0;i<listp->numParticipant;i++)
+        if(participant_get_particleNum(listp->list[i])!=0)
+            (*c)[participant_get_id(listp->list[i])%4]++;
+    return;
+}
+
+
+
+/**
  * participant_list_free:
  * 
  * Función que libera la memoria utilizada por un listp. Libera la memoria
