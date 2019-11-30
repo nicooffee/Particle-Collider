@@ -31,6 +31,13 @@
 #define NEGRO_BLANCO    13
 #define BLANCO_AZUL     14
 #define BLANCO_NEGRO    15
+#define NEGRO_ROJO     16
+#define NEGRO_VERDE    17
+#define NEGRO_AMARILLO 18
+#define NEGRO_CYAN     19
+#define NEGRO_MAGENTA  20
+#define NEGRO_AZUL     22
+
 
 
 /**-------------------------------------------ESTRUCTURAS------------------------------------------------------------**/
@@ -351,9 +358,9 @@ void *print_participant_list(void *message){
             if(participant_get_particleNum(aux)!=0)
                 print_participant(aux,w);
         }
+        pthread_mutex_unlock(&mutex_participant);
         wnoutrefresh(w);
         pthread_mutex_unlock(&mutex_screen);
-        pthread_mutex_unlock(&mutex_participant);
         usleep(delay);
     }
     return NULL;
@@ -380,7 +387,10 @@ void *print_colisiones(void *message){
     lB = (maxx)*20/100;
     lC = (maxx)*15/100;
     lA += maxx - (lA+lB+(lC*2));
+    pthread_mutex_lock(&mutex_screen);
     mvwprintw(w,0,0,"|%-*s|(% -*s,% *s)|%-*s|%-*s|",lA-1,"Instante",((lB-2)%2!=0?((lB-2)/2)+1:(lB-2)/2)-1,"X",(lB-2)/2-2,"Y",lC-1,"P1",lC-1,"P2");
+    wnoutrefresh(w);
+    pthread_mutex_unlock(&mutex_screen);
     while(ejec_flag){
         line = 1;
         pthread_mutex_lock(&mutex_screen);
@@ -414,24 +424,30 @@ void *print_colisiones(void *message){
  * bajo un thread.
  */
 void *print_info(void *message){
-    int maxx,delay,*cPerId,i;
+    int maxx,delay,*cPerId,i,acum=0,cActive;
     WINDOW *w = ((struct Message_w*) message)->w1;
     Participant_list listp = ((struct Message_w*) message)->listp;
     delay = ((struct Message_w*) message)->delay;
     maxx = getmaxx(w);
     while(ejec_flag){
+        acum = 0;
+        pthread_mutex_lock(&mutex_participant);
+        participant_list_get_arrActive(listp,&cPerId);
+        cActive = participant_list_get_numActive(listp);
+        pthread_mutex_unlock(&mutex_participant);
         pthread_mutex_lock(&mutex_screen);
         mvwhline(w,1,0,' ',maxx);
         mvwprintw(w,1,0," Instante actual: %10d",INSTANT);
         mvwhline(w,2,0,' ',maxx);
-        pthread_mutex_lock(&mutex_participant);
-        participant_list_get_arrActive(listp,&cPerId);
-        mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,participant_list_get_numActive(listp));
-        pthread_mutex_unlock(&mutex_participant);
-        for(i=1;i<=4;i++){
-            wattron(w,COLOR_PAIR(i+7));
-            mvwprintw(w,3,1+maxx*(i-1)/4,"P %d: %03d",i,cPerId[i-1]);
-            wattroff(w,COLOR_PAIR(i+7));
+        mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,cActive);
+        mvwhline(w,3,0,' ',maxx);
+        for(i=1;i<=4 && cActive > 0;i++){
+            wattron(w,COLOR_PAIR(i+15));
+            mvwhline(w,3,acum,'|',cPerId[i-1]*maxx/cActive);
+            mvwprintw(w,3,acum+1,"%03d",cPerId[i-1]);
+            acum = acum + cPerId[i-1]*maxx/cActive;
+            if(i==4 && acum<maxx) mvwhline(w,3,acum,'|',10);
+            wattroff(w,COLOR_PAIR(i+15));
         }
         wnoutrefresh(w);
         doupdate();
@@ -550,6 +566,13 @@ void init_setup(){
     init_pair(BLANCO_NEGRO,COLOR_WHITE,COLOR_BLACK);
     init_pair(BLANCO_AZUL,COLOR_WHITE,COLOR_BLUE);
     init_pair(NEGRO_BLANCO,COLOR_BLACK,COLOR_WHITE);
+
+    init_pair(NEGRO_ROJO,COLOR_RED,COLOR_BLACK);
+    init_pair(NEGRO_VERDE,COLOR_GREEN,COLOR_BLACK);
+    init_pair(NEGRO_AMARILLO,COLOR_YELLOW,COLOR_BLACK);
+    init_pair(NEGRO_CYAN,COLOR_CYAN,COLOR_BLACK);
+    init_pair(NEGRO_MAGENTA,COLOR_MAGENTA,COLOR_BLACK);
+    init_pair(NEGRO_AZUL,COLOR_BLUE,COLOR_BLACK);
     curs_set(FALSE);
 }
 
