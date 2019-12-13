@@ -439,7 +439,7 @@ void *print_info(void *message){
         mvwhline(w,1,0,' ',maxx);
         mvwprintw(w,1,0," Instante actual: %10d",INSTANT);
         mvwhline(w,2,0,' ',maxx);
-        mvwprintw(w,2,0," Colisiones: %5d| Participantes restantes: %2d",COLISIONES,cActive);
+        mvwprintw(w,2,0," Colisiones: %5d/%.3f%%| Participantes restantes: %2d",COLISIONES,((float)COLISIONES)/((float)INSTANT)*100,cActive);
         mvwhline(w,3,0,' ',maxx);
         for(i=1;i<=4 && cActive > 0;i++){
             wattron(w,COLOR_PAIR(i+15));
@@ -486,9 +486,9 @@ void *stop_ejec(void *message){
  * de un participante en la ventana w.
  */
 void print_participant(Participant p, WINDOW *w){
-    wattron(w,COLOR_PAIR(participant_get_id(p)%4+1));
+    wattron(w,COLOR_PAIR(participant_get_id(p)%4+16));
     mvwprintw(w,participant_get_y(p),participant_get_x(p),"*");
-    wattroff(w,COLOR_PAIR(participant_get_id(p)%4+1));
+    wattroff(w,COLOR_PAIR(participant_get_id(p)%4+16));
 }
 
 /**---------------------------------------FUNCIONES DE CREACIÓN------------------------------------------------------**/
