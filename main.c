@@ -576,7 +576,10 @@ void init_setup(){
     curs_set(FALSE);
 }
 
-
+/**
+ * Funcion que reinicia los colores de la consola antes de finalizar
+    * la ejecución
+ */
 void reset_color(){
     if(can_change_color()){
         init_color(COLOR_RED,    (680),(0),(0));
@@ -590,11 +593,12 @@ void reset_color(){
     }
     return;
 }
+
+
+
 /**
  * Inicializadores de marcos de ventanas.
  */
-
-
 void set_frame_w1(WINDOW *w){
     int maxx,maxy;
     getmaxyx(w,maxy,maxx);
